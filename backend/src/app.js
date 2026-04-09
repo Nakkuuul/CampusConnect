@@ -2,12 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './middlewares/error.middleware.js';
 import routes from './routes/index.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 // ── Security / misc ───────────────────────────────────────────────────────────
@@ -29,6 +32,9 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/api/auth', authLimiter);
+
+// ── Static files (uploaded images) ───────────────────────────────────────────
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api', routes);
