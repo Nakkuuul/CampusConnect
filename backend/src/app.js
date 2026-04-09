@@ -14,7 +14,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 // ── Security / misc ───────────────────────────────────────────────────────────
-app.use(cors({ origin: env.clientOrigin, credentials: true }));
+const allowedOrigins = env.clientOrigin.split(',').map(o => o.trim());
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
