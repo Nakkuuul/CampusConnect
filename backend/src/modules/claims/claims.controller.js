@@ -5,7 +5,7 @@ import {
   getClaimsByItem,
   getClaimById,
   reviewClaim,
-  deleteClaim,
+  deleteClaim as deleteClaim,
 } from './claims.service.js';
 import { sendSuccess, sendError } from '../../utils/response.js';
 import { logger } from '../../utils/logger.js';
