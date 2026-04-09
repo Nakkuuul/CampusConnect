@@ -82,7 +82,7 @@ npm install
 Create `.env`:
 
 ```env
-PORT=5000
+PORT=8080
 NODE_ENV=development
 MONGO_URI=mongodb://localhost:27017/campusconnect
 JWT_SECRET=your_secret_key_here
@@ -102,7 +102,7 @@ Start the server:
 npm start
 ```
 
-Backend runs at `http://localhost:5000`
+Backend runs at `http://localhost:8080`
 
 ### 3. Frontend setup
 
@@ -114,7 +114,7 @@ npm install
 Create `.env.local`:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:5000/api
+NEXT_PUBLIC_API_URL=http://localhost:8080/api
 ```
 
 Start the dev server:
@@ -129,7 +129,7 @@ Frontend runs at `http://localhost:3000`
 
 ## API Reference
 
-Base URL: `http://localhost:5000/api`
+Base URL: `http://localhost:8080/api`
 
 ### Auth
 
@@ -222,7 +222,7 @@ app.listen(env.port, '0.0.0.0', () => { ... })
 Update frontend `.env.local`:
 
 ```env
-NEXT_PUBLIC_API_URL=http://<your-ip>:5000/api
+NEXT_PUBLIC_API_URL=http://<your-ip>:8080/api
 ```
 
 Start frontend on all interfaces:
@@ -250,7 +250,7 @@ exit
 
 | Variable | Description |
 |---|---|
-| `PORT` | Server port (default 5000) |
+| `PORT` | Server port (default 8080) |
 | `NODE_ENV` | `development` or `production` |
 | `MONGO_URI` | MongoDB connection string |
 | `JWT_SECRET` | Secret key for signing tokens |
