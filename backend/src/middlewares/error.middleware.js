@@ -1,28 +1,33 @@
-module.exports = (err, req, res, next) => {
-  // Default values
-  let statusCode = err.statusCode || 500;
-  let message = err.message || "Internal Server Error";
+import { sendError } from '../utils/response.js';
+import { logger } from '../utils/logger.js';
 
-  // Log error (important for debugging)
-  console.error("Error:", {
-    message: err.message,
-    stack: err.stack,
-    url: req.originalUrl,
-    method: req.method,
-  });
+/**
+ * Global error handling middleware.
+ * Must be registered last in app.js (after all routes).
+ */
+export const errorHandler = (err, req, res, next) => {
+  logger.error(`${req.method} ${req.originalUrl} — ${err.message}`);
 
-  // Handle specific known errors (optional extensions)
-
-  // Example: JSON parse error
-  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
-    statusCode = 400;
-    message = "Invalid JSON payload";
+  // Mongoose validation error
+  if (err.name === 'ValidationError') {
+    const messages = Object.values(err.errors).map(e => e.message);
+    return sendError(res, 422, 'Validation failed', messages);
   }
 
-  // Send response
-  res.status(statusCode).json({
-    success: false,
-    message,
-    ...(process.env.NODE_ENV === "development" && { stack: err.stack })
-  });
+  // Mongoose duplicate key error
+  if (err.code === 11000) {
+    const field = Object.keys(err.keyValue)[0];
+    return sendError(res, 409, `An account with this ${field} already exists.`);
+  }
+
+  // JWT errors (caught in middleware, but as a safety net)
+  if (err.name === 'JsonWebTokenError') {
+    return sendError(res, 401, 'Invalid token.');
+  }
+  if (err.name === 'TokenExpiredError') {
+    return sendError(res, 401, 'Token has expired. Please log in again.');
+  }
+
+  // Default
+  return sendError(res, err.statusCode || 500, err.message || 'Internal server error');
 };

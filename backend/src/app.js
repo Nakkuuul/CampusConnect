@@ -1,17 +1,45 @@
-const express = require("express");
+import express from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
+
+import { env } from './config/env.js';
+import { logger } from './utils/logger.js';
+import { errorHandler } from './middlewares/error.middleware.js';
+import routes from './routes/index.js';
 
 const app = express();
 
-// Middleware
+// ── Security / misc ───────────────────────────────────────────────────────────
+app.use(cors({ origin: env.clientOrigin, credentials: true }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Health check
-app.get("/health", (req, res) => {
-  res.json({ status: "OK" });
+// ── Logging ───────────────────────────────────────────────────────────────────
+if (env.isDev) {
+  app.use(morgan('dev'));
+}
+
+// ── Rate limiting (auth endpoints especially) ─────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  message: { success: false, message: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
+app.use('/api/auth', authLimiter);
 
-// Global error handler
-const errorMiddleware = require("./middlewares/error.middleware");
-app.use(errorMiddleware);
+// ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/api', routes);
 
-module.exports = app;
+// ── Health check ──────────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => res.json({ status: 'ok', env: env.nodeEnv }));
+
+// ── 404 handler ───────────────────────────────────────────────────────────────
+app.use((_req, res) => res.status(404).json({ success: false, message: 'Route not found.' }));
+
+// ── Global error handler (must be last) ───────────────────────────────────────
+app.use(errorHandler);
+
+export default app;
