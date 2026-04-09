@@ -1,28 +1,31 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import { Upload, CheckCircle, MapPin, Calendar, Tag, AlignLeft, ArrowRight, X, Image } from 'lucide-react';
-import { Suspense } from 'react';
+import { itemService } from '../../lib/services/item.service';
 
 const categories = ['Electronics', 'Documents', 'Accessories', 'Stationery', 'ID/Cards', 'Clothing', 'Keys', 'Other'];
-const locations = ['Main Library', 'Cafeteria Block C', 'Sports Complex', 'Computer Lab 101', 'Lecture Hall B2', 'Hostel Block A', 'Parking Area', 'Gym', 'Admin Block', 'Other'];
+const locations  = ['Main Library', 'Cafeteria Block C', 'Sports Complex', 'Computer Lab 101', 'Lecture Hall B2', 'Hostel Block A', 'Parking Area', 'Gym', 'Admin Block', 'Other'];
 
 function ReportForm() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const defaultType = searchParams.get('type') === 'found' ? 'found' : 'lost';
+  const router       = useRouter();
+  const defaultType  = searchParams.get('type') === 'found' ? 'found' : 'lost';
 
-  const [type, setType] = useState<'lost' | 'found'>(defaultType as 'lost' | 'found');
-  const [form, setForm] = useState({ title: '', category: '', location: '', date: '', description: '' });
+  const [type, setType]               = useState<'lost' | 'found'>(defaultType as 'lost' | 'found');
+  const [form, setForm]               = useState({ title: '', category: '', location: '', date: '', description: '' });
+  const [imageFile, setImageFile]     = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted]     = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [apiError, setApiError]       = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onload = ev => setImagePreview(ev.target?.result as string);
       reader.readAsDataURL(file);
@@ -32,9 +35,31 @@ function ReportForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setLoading(false);
-    setSubmitted(true);
+    setApiError('');
+    try {
+      await itemService.report({
+        type,
+        title:       form.title,
+        category:    form.category,
+        location:    form.location,
+        date:        form.date,
+        description: form.description,
+        image:       imageFile,
+      });
+      setSubmitted(true);
+    } catch (err: any) {
+      setApiError(err.response?.data?.message || 'Failed to post item. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setSubmitted(false);
+    setForm({ title: '', category: '', location: '', date: '', description: '' });
+    setImageFile(null);
+    setImagePreview(null);
+    setApiError('');
   };
 
   if (submitted) {
@@ -49,9 +74,7 @@ function ReportForm() {
         </p>
         <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 32 }}>Smart matching is scanning for potential matches…</p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <button className="btn-ghost" onClick={() => { setSubmitted(false); setForm({ title: '', category: '', location: '', date: '', description: '' }); setImagePreview(null); }}>
-            Report another
-          </button>
+          <button className="btn-ghost" onClick={handleReset}>Report another</button>
           <button className="btn-primary" onClick={() => router.push('/dashboard')}>
             Go to Dashboard <ArrowRight size={15} />
           </button>
@@ -61,7 +84,7 @@ function ReportForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <form onSubmit={handleSubmit}>
       {/* Type selector */}
       <div style={{ display: 'flex', marginBottom: 28, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
         {(['lost', 'found'] as const).map(t => (
@@ -77,15 +100,23 @@ function ReportForm() {
         ))}
       </div>
 
+      {/* API error */}
+      {apiError && (
+        <div style={{ padding: '10px 14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, marginBottom: 16, fontSize: 13, color: '#f87171' }}>
+          {apiError}
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         <div style={{ gridColumn: '1 / -1' }}>
           <label className="label"><AlignLeft size={10} style={{ display: 'inline', marginRight: 5 }} />Item Title</label>
-          <input className="input" placeholder={type === 'lost' ? 'e.g. Apple AirPods Pro' : 'e.g. Found blue wallet'} value={form.title} onChange={e => setForm(f => ({...f, title: e.target.value}))} required />
+          <input className="input" placeholder={type === 'lost' ? 'e.g. Apple AirPods Pro' : 'e.g. Found blue wallet'}
+            value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
         </div>
 
         <div>
           <label className="label"><Tag size={10} style={{ display: 'inline', marginRight: 5 }} />Category</label>
-          <select className="input" value={form.category} onChange={e => setForm(f => ({...f, category: e.target.value}))} required>
+          <select className="input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} required>
             <option value="">Select category</option>
             {categories.map(c => <option key={c}>{c}</option>)}
           </select>
@@ -93,12 +124,12 @@ function ReportForm() {
 
         <div>
           <label className="label"><Calendar size={10} style={{ display: 'inline', marginRight: 5 }} />Date {type === 'lost' ? 'Lost' : 'Found'}</label>
-          <input className="input" type="date" value={form.date} onChange={e => setForm(f => ({...f, date: e.target.value}))} required />
+          <input className="input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required />
         </div>
 
         <div style={{ gridColumn: '1 / -1' }}>
           <label className="label"><MapPin size={10} style={{ display: 'inline', marginRight: 5 }} />Location</label>
-          <select className="input" value={form.location} onChange={e => setForm(f => ({...f, location: e.target.value}))} required>
+          <select className="input" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} required>
             <option value="">Select location</option>
             {locations.map(l => <option key={l}>{l}</option>)}
           </select>
@@ -106,7 +137,9 @@ function ReportForm() {
 
         <div style={{ gridColumn: '1 / -1' }}>
           <label className="label">Description</label>
-          <textarea className="input" placeholder="Describe the item in detail — color, brand, size, any distinguishing marks…" value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} required style={{ minHeight: 110 }} />
+          <textarea className="input" placeholder="Describe the item in detail — color, brand, size, any distinguishing marks…"
+            value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+            required style={{ minHeight: 110 }} />
         </div>
       </div>
 
@@ -117,15 +150,15 @@ function ReportForm() {
         {imagePreview ? (
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <img src={imagePreview} alt="preview" style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }} />
-            <button type="button" onClick={() => setImagePreview(null)} style={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <button type="button" onClick={() => { setImageFile(null); setImagePreview(null); }}
+              style={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
               <X size={12} color="var(--text-muted)" />
             </button>
           </div>
         ) : (
           <button type="button" onClick={() => fileRef.current?.click()} style={{
             width: '100%', padding: '28px', border: '2px dashed var(--border)', borderRadius: 10,
-            background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', gap: 8, transition: 'border-color 0.2s',
+            background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
           }}
           onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
           onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
@@ -136,7 +169,7 @@ function ReportForm() {
         )}
       </div>
 
-      <button type="submit" className="btn-primary" style={{ justifyContent: 'center', padding: '14px' }} disabled={loading}>
+      <button type="submit" className="btn-primary" style={{ justifyContent: 'center', padding: '14px', width: '100%' }} disabled={loading}>
         {loading ? 'Posting…' : `Post ${type === 'lost' ? 'Lost' : 'Found'} Item`}
         {!loading && <ArrowRight size={16} />}
       </button>
@@ -148,19 +181,18 @@ export default function ReportPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <Navbar />
-      <main style={{ paddingTop: 80, maxWidth: 700, margin: '0 auto', padding: '80px 24px 48px' }}>
+      <main style={{ maxWidth: 700, margin: '0 auto', padding: '80px 24px 48px' }}>
         <div className="animate-fadeUp" style={{ marginBottom: 28 }}>
           <h1 style={{ fontFamily: 'Syne', fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 6 }}>Report an Item</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Fill in the details and we'll match it with existing posts</p>
         </div>
 
         <div className="card animate-fadeUp stagger-1" style={{ padding: 32 }}>
-          <Suspense fallback={<div style={{color:'var(--text-muted)'}}>Loading…</div>}>
+          <Suspense fallback={<div style={{ color: 'var(--text-muted)' }}>Loading…</div>}>
             <ReportForm />
           </Suspense>
         </div>
 
-        {/* Tips */}
         <div className="card animate-fadeUp stagger-2" style={{ padding: 20, marginTop: 20 }}>
           <p className="section-title">Tips for a better post</p>
           <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
